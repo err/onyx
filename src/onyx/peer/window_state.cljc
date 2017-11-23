@@ -101,6 +101,12 @@
                                  (st/put-trigger! state-store trigger-idx group-id next-trigger-state)                        
                                  next-trigger-state))
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :new-segment))
+          ;; FIXME, do not allow time range stuff for sliding windows or session windows.
+          _ (println "STATE ENTRIES" 
+                     (st/get-state-entries-times state-store idx group-id)
+                     #_(st/get-state-entries state-store idx group-id 0 Long/MAX_VALUE)
+                     
+                     )
           fire-extents (if fire-all? 
                          (st/group-extents state-store idx group-id)
                          (:extents state-event))
@@ -146,13 +152,14 @@
 
   (apply-extents [this state-event]
     (let [{:keys [segment group-id]} state-event
-          time-index (we/time-index window-extension segment)
+          time (we/get-time window-extension segment)
+          time-index (we/time-index window-extension time)
+          ;segment-extents (we/extents window-extension time-index)
           operations (we/extent-operations window-extension 
                                            (delay (st/group-extents state-store idx group-id))
                                            segment
                                            time-index)
-          updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent))
-                                          operations))
+          updated-extents (distinct (keep (fn [[op extent]] (if (= op :update) extent)) operations))
           transition-entry (create-state-update window segment)]
       (when ordered-log? 
         (st/put-state-entry! state-store idx group-id time-index transition-entry))
